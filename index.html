@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <script type="text/javascript" src="scripts/libraries/Box2dWeb-2.1.a.3.js"></script>
+</head>
+<body onload="">
+  <canvas id="canvas" width="800" height="500" style="background-color:#333333;" ></canvas>
+  <div id="info"></div>
+</body>
+<script type="text/javascript">
+	(function() {
+         var   b2Vec2 = Box2D.Common.Math.b2Vec2
+            ,  b2AABB = Box2D.Collision.b2AABB
+         	,	b2BodyDef = Box2D.Dynamics.b2BodyDef
+         	,	b2Body = Box2D.Dynamics.b2Body
+         	,	b2FixtureDef = Box2D.Dynamics.b2FixtureDef
+         	,	b2Fixture = Box2D.Dynamics.b2Fixture
+         	,	b2World = Box2D.Dynamics.b2World
+			,	b2Math = Box2D.Common.Math.b2Math
+         	,	b2MassData = Box2D.Collision.Shapes.b2MassData
+			,   b2Shape = Box2D.Collision.Shapes.b2Shape
+         	,	b2PolygonShape = Box2D.Collision.Shapes.b2PolygonShape
+         	,	b2CircleShape = Box2D.Collision.Shapes.b2CircleShape
+         	,	b2DebugDraw = Box2D.Dynamics.b2DebugDraw
+            ,  b2MouseJointDef =  Box2D.Dynamics.Joints.b2MouseJointDef
+            ;	
+
+		var CANVAS_WIDTH = 800;
+		var CANVAS_HEIGHT = 500;
+
+		var SCALE = 30.0;
+		var DEGTORAD = Math.PI / 180;
+
+		var WOOD_WIDTH = 240;
+		var WOOD_HEIGHT = 10;
+		var WOOD_MAXANGLE = 45;
+			
+		var bgImg = new Image();
+		bgImg.src = 'images/game_bg.jpg';
+			
+		var woodImg = new Image();
+		woodImg.src = 'images/wood.jpg';
+
+		var ballImg = new Image();
+		ballImg.src = 'images/ball.png';
+
+		var crateImg = new Image();
+		crateImg.src = 'images/crate.jpg';
+	
+	
+		var canvas = document.querySelector("#canvas");
+		var ctx = canvas.getContext("2d");
+	
+		var world = new b2World(
+			new Box2D.Common.Math.b2Vec2(0, 10), //Gravity
+			true // allow sleep?
+		);
+		
+		
+        var fixDef = new b2FixtureDef;
+        fixDef.density = 1.0; //sûrûség
+        fixDef.friction = 0.7; // surlódás
+        fixDef.restitution = 0;//0.4;		// rugalmasság
+
+		var bodyDef = new b2BodyDef;
+
+		//create fixpoint
+        bodyDef.type = b2Body.b2_staticBody;
+        fixDef.shape = new b2CircleShape( 0.1 );
+        bodyDef.position.Set(CANVAS_WIDTH / 2 / SCALE, CANVAS_HEIGHT * 0.6 / SCALE);
+        fixBody = world.CreateBody(bodyDef);
+		fixBody.CreateFixture(fixDef);
+		
+		//create wood
+        bodyDef.type = b2Body.b2_dynamicBody;
+        fixDef.shape = new b2PolygonShape;
+        fixDef.shape.SetAsBox(WOOD_WIDTH / SCALE, WOOD_HEIGHT / SCALE);
+        bodyDef.position.Set(CANVAS_WIDTH / 2 / SCALE, CANVAS_HEIGHT * 0.6 / SCALE);
+        var woodBody = world.CreateBody(bodyDef);
+		woodBody.CreateFixture(fixDef);
+		
+		var joint = new Box2D.Dynamics.Joints.b2RevoluteJointDef();
+		joint.Initialize(fixBody, woodBody, new b2Vec2(bodyDef.position.x, bodyDef.position.y)); 
+		joint.lowerAngle = -WOOD_MAXANGLE * DEGTORAD;
+		joint.upperAngle = WOOD_MAXANGLE * DEGTORAD;
+		joint.enableLimit = true;
+		var woodJoint = world.CreateJoint(joint);		 
+		
+		bodyDef.type = b2Body.b2_dynamicBody;
+		
+		function CreateRandomObject() {
+			if (Math.random() > 0.3) {
+				fixDef.shape = new b2PolygonShape;
+				fixDef.density = 1.0;
+				fixDef.restitution = 0;//0.4;		// rugalmasság
+				var size = Math.random() * 0.5 + 0.3;
+				fixDef.shape.SetAsBox(size, size);
+			} else {
+				fixDef.density = 1.0;
+				fixDef.restitution = 0.2;//0.4;		// rugalmasság
+				fixDef.shape = new b2CircleShape( Math.random() * 0.5 + 0.3);
+			}
+			
+			bodyDef.position.x = (CANVAS_WIDTH / 2 + (WOOD_WIDTH * Math.random() - (WOOD_WIDTH / 2))) / SCALE;
+			bodyDef.position.y = -1; //Math.random() * 10;
+			world.CreateBody(bodyDef).CreateFixture(fixDef);			
+		}
+		
+		/*
+		for(var i = 0;i < 10; i++) {
+			CreateRandomObject();
+		}*/
+		
+		
+		canvas.addEventListener("mousemove", function(event) {
+			//document.querySelector("#info").innerHTML = "X: " + event.offsetX + " Y: " + event.offsetY;
+			var center = CANVAS_WIDTH / 2;
+			var delta = event.offsetX - center;
+			
+			if (Math.abs(delta) > 10)
+			{
+				woodJoint.SetMaxMotorTorque(delta * 1.5);
+				woodJoint.SetMotorSpeed(Math.abs(delta) * DEGTORAD);
+				woodJoint.EnableMotor(true);
+				//document.querySelector("#info").innerHTML = woodBody.GetAngle();
+			} else {
+				woodJoint.EnableMotor(false);
+			}
+		});
+		/*
+		canvas.addEventListener("blur", function(event) {
+			woodJoint.EnableMotor(false);
+		});*/
+		
+		/* Android accelerometer
+		function accelerationChanged(a) {
+		    var angle = a.y / 11 * (3.14 / 2);
+
+			var origAngle = woodBody.GetAngle();
+			var delta = origAngle - angle;
+			if (Math.abs(delta) > 0.05)
+			{
+				woodJoint.SetMaxMotorTorque(1000);
+				woodJoint.SetMotorSpeed(-delta * 2);
+				woodJoint.EnableMotor(true);
+			    document.querySelector("#info").innerHTML =  delta;// + "  " + angle + "   " + origAngle + "   " + a.y;
+			} else {
+				woodJoint.EnableMotor(false);
+			    document.querySelector("#info").innerHTML = "STOP  " + delta;// + "  " + angle + "   " + origAngle + "   " + a.y;
+			}		    
+		}
+
+        var accelerationWatch = navigator.accelerometer.watchAcceleration(accelerationChanged, function(ex) {
+                //alert("accel fail (" + ex.name + ": " + ex.message + ")");
+				document.querySelector("#info").innerHTML =  "accel fail (" + ex.name + ": " + ex.message + ")";
+            }, {frequency: 1000}
+		);	*/	
+		
+		
+		var gameOverListener = new Box2D.Dynamics.b2DestructionListener;
+		gameOverListener.SayGoodbyeFixture = function(fixture) {
+			document.querySelector("#info").innerHTML = "GAME OVER";
+		};		
+		world.SetDestructionListener(gameOverListener);
+		
+		
+		var lastCreateTime = new Date().getTime();
+		
+		var debugDraw = new b2DebugDraw();
+		debugDraw.SetSprite(ctx);
+		debugDraw.SetDrawScale(SCALE);
+		debugDraw.SetFillAlpha(0.3);
+		debugDraw.SetLineThickness(1.0);
+		debugDraw.SetFlags(b2DebugDraw.e_shapeBit | b2DebugDraw.e_jointBit);
+		world.SetDebugDraw(debugDraw);		
+		
+		window.requestAnimFrame = (function(){
+				  return  window.requestAnimationFrame       || 
+						  window.webkitRequestAnimationFrame || 
+						  window.mozRequestAnimationFrame    || 
+						  window.oRequestAnimationFrame      || 
+						  window.msRequestAnimationFrame     || 
+						  function(/* function */ callback, /* DOMElement */ element){
+							window.setTimeout(callback, 1000 / 60);
+						  };
+			})();		
+		
+		function update() {
+			world.Step( 1 / 60, 10, 10); //Framerate, velocity, position
+			world.DrawDebugData();
+			world.ClearForces();
+			
+			//drawWorld();
+			
+			var now = new Date().getTime();
+			if (now - lastCreateTime > 2000)
+			{
+				CreateRandomObject();
+				lastCreateTime = new Date().getTime();
+			}
+			
+			requestAnimFrame(update);		
+		};
+		
+		//setInterval(CreateRandomObject, 2000);
+		
+		requestAnimFrame(update);
+		//alert("Go");
+		
+		function drawWorld() {
+			//ctx.fillStyle = "#555555";
+			//ctx.fillRect(0, 0, 800, 500);
+			ctx.drawImage(bgImg, 0, 0);
+			
+			var woodShape = woodBody.GetFixtureList();
+			var shape = woodShape.GetShape();
+			ctx.save();
+			ctx.translate(woodBody.GetPosition().x * SCALE, woodBody.GetPosition().y * SCALE);
+			ctx.rotate(woodBody.GetAngle());
+			var centerX = -1 * (1500 / 2);
+			var centerY = -1 * (32 / 2);
+			var vertList = shape.GetVertices();
+			
+			var scaleX = Math.abs(vertList[0].x * SCALE) / (1500 / 2);
+			var scaleY = Math.abs(vertList[0].y * SCALE) / (32 / 2);
+			ctx.scale(scaleX, scaleY);
+			ctx.drawImage(woodImg, centerX, centerY);
+			ctx.restore();			
+			
+			var node = world.GetBodyList();
+			while(node) {
+				var position = node.GetPosition();
+				if (position.y > CANVAS_HEIGHT / SCALE)
+				{
+					world.DestroyBody(node);
+					node  = node.GetNext();
+					continue;
+				}
+				if (node.GetType() == b2Body.b2_dynamicBody/* || node.GetType() == b2Body.b2_staticBody*/) {
+					//var flipY = 500 - position.y * SCALE;
+					var fixList = node.GetFixtureList();
+					if (!fixList) continue;
+					
+					var shape = fixList.GetShape();
+					var shapeType = shape.GetType();
+					
+					if (shapeType == b2Shape.e_circleShape) {
+						ctx.save();
+						ctx.translate(position.x * SCALE, position.y * SCALE);
+						ctx.rotate(node.GetAngle());
+						var center = -1 * (64 / 2);
+						var scale = shape.GetRadius() * SCALE / (64 / 2);
+						ctx.scale(scale, scale);
+						ctx.drawImage(ballImg, center, center);
+						ctx.restore();
+					
+						/*
+						ctx.strokeStyle = "#CCCCCC";
+						ctx.fillStyle = "#FF5000";
+						ctx.beginPath();
+						ctx.arc(position.x * SCALE, position.y * SCALE, shape.GetRadius() * SCALE, 0, Math.PI * 2, true);
+						ctx.closePath();
+						ctx.stroke();
+						ctx.fill();*/
+					} else if (shapeType == b2Shape.e_polygonShape && node !== woodBody) {
+						ctx.save();
+						ctx.translate(position.x * SCALE, position.y * SCALE);
+						ctx.rotate(node.GetAngle());
+						var center = -1 * (128 / 2);
+						var vertList = shape.GetVertices();
+						
+						var scale = Math.abs(vertList[0].x * SCALE) / (128 / 2);
+						ctx.scale(scale, scale);
+						ctx.drawImage(crateImg, center, center);
+						ctx.restore();						
+					
+						/*ctx.strokeStyle = "#CCCCCC";
+						ctx.fillStyle = "#50FF00";
+						var vert = shape.GetVertices();
+						ctx.beginPath();
+						
+						b2Math.MulMV(node.m_xf.R, vert[0]);
+						var tV = b2Math.AddVV(position, b2Math.MulMV(node.m_xf.R, vert[0]));
+						ctx.moveTo(tV.x * SCALE, tV.y * SCALE);
+						for (var i = 0; i < vert.length; i++)
+						{
+							var v = b2Math.AddVV(position, b2Math.MulMV(node.m_xf.R, vert[i]));
+							ctx.lineTo(v.x * SCALE, v.y * SCALE);
+						}
+						ctx.lineTo(tV.x * SCALE, tV.y * SCALE);
+						ctx.closePath();
+						ctx.stroke();
+						ctx.fill();
+						*/
+					}
+				
+				}
+
+
+				node  = node.GetNext();
+			}
+		
+		}
+	
+	})();
+</script>
+</html>
